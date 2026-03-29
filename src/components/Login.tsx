@@ -1,19 +1,34 @@
 import React, { useState } from 'react';
-import { Sprout, Lock, Mail, ChevronRight } from 'lucide-react';
+import { Sprout, Lock, Mail, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
-interface LoginProps {
-  onLogin: () => void;
-}
-
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In Phase 3, this will integrate with Supabase
-    if (email && password) {
-      onLogin(); 
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      if (isSignUp) {
+        // Create an account
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        alert('Success! Check your email for the confirmation link to activate your account.');
+      } else {
+        // Sign in normally
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'An error occurred during authentication');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -42,34 +57,46 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           }}>
             <Sprout size={32} color="var(--brand-primary)" />
           </div>
-          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>Welcome Back</h2>
+          <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
+            {isSignUp ? 'Create Admin Account' : 'Welcome Back'}
+          </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-            Enter your credentials to access the precision seed dashboard.
+            {isSignUp 
+              ? 'Register a secure account to access the dashboard' 
+              : 'Enter your credentials to access the precision seed dashboard.'}
           </p>
         </div>
 
+        {errorMsg && (
+          <div style={{
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid var(--danger)',
+            padding: '0.75rem',
+            borderRadius: 'var(--radius-md)',
+            color: 'var(--text-primary)',
+            fontSize: '0.85rem',
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <AlertCircle color="var(--danger)" size={18} />
+            {errorMsg}
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Email Address
-            </label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Email Address</label>
             <div style={{ position: 'relative' }}>
               <Mail size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
               <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
                 placeholder="agri@example.com"
-                required
                 style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem 0.75rem 2.8rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border)',
-                  background: 'rgba(0,0,0,0.2)',
-                  color: 'white',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
+                  width: '100%', padding: '0.75rem 1rem 0.75rem 2.8rem',
+                  borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
+                  background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none',
                   fontSize: '0.95rem'
                 }}
               />
@@ -77,36 +104,43 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
 
           <div>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Password
-            </label>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Password</label>
             <div style={{ position: 'relative' }}>
               <Lock size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
               <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
                 placeholder="••••••••"
-                required
                 style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem 0.75rem 2.8rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border)',
-                  background: 'rgba(0,0,0,0.2)',
-                  color: 'white',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
+                  width: '100%', padding: '0.75rem 1rem 0.75rem 2.8rem',
+                  borderRadius: 'var(--radius-md)', border: '1px solid var(--border)',
+                  background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none',
                   fontSize: '0.95rem'
                 }}
               />
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem', width: '100%' }}>
-            Sign In <ChevronRight size={18} />
+          <button type="submit" disabled={loading} className="btn btn-primary" style={{ marginTop: '0.5rem', width: '100%', opacity: loading ? 0.7 : 1 }}>
+            {loading ? <Loader2 className="animate-spin" size={18} /> : (isSignUp ? 'Sign Up' : 'Sign In')} 
+            {!loading && <ChevronRight size={18} />}
           </button>
         </form>
+
+        <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+          <button 
+            type="button" 
+            onClick={() => setIsSignUp(!isSignUp)}
+            style={{ 
+              background: 'none', border: 'none', 
+              color: 'var(--brand-secondary)', 
+              fontSize: '0.85rem', cursor: 'pointer',
+              textDecoration: 'underline'
+            }}
+          >
+            {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up First'}
+          </button>
+        </div>
+
       </div>
     </div>
   );
