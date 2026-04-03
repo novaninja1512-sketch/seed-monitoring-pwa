@@ -53,16 +53,19 @@ const Login: React.FC = () => {
             padding: '1rem',
             borderRadius: 'var(--radius-full)',
             background: 'rgba(16, 185, 129, 0.1)',
-            marginBottom: '1rem'
+            marginBottom: '0.5rem'
           }}>
             <Sprout size={32} color="var(--brand-primary)" />
           </div>
+          <h1 style={{ fontSize: '1.15rem', color: 'var(--brand-primary)', marginBottom: '1.5rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase' }}>
+            KriFarm Equipments
+          </h1>
           <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>
             {isSignUp ? 'Create Admin Account' : 'Welcome Back'}
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
             {isSignUp 
-              ? 'Register a secure account to access the dashboard' 
+              ? 'Register a secure account to access the KriFarm portal.' 
               : 'Enter your credentials to access the precision seed dashboard.'}
           </p>
         </div>
@@ -140,6 +143,10 @@ const Login: React.FC = () => {
             {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up First'}
           </button>
         </div>
+
+        <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', marginTop: '2rem' }}>
+          Developed by KriFarm Equipments Pvt. Ltd.
+        </p>
 
       </div>
     </div>

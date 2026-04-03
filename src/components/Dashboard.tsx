@@ -112,10 +112,10 @@ const Dashboard = ({ onLogout, outletCount = 6 }: DashboardProps) => {
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '1.875rem' }}>
             <Activity color="var(--brand-primary)" size={32} />
-            Seed Monitor Active
+            KriFarm Seed Monitor
           </h1>
           <p style={{ color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Live PostgreSQL + ESP32 Precision Tracking
+            Developed by KriFarm Equipments Pvt. Ltd.
           </p>
         </div>
         

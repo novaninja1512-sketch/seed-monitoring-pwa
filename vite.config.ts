@@ -10,9 +10,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'Seed Monitor Dashboard',
-        short_name: 'SeedDash',
-        description: 'Real-Time Outlet-Wise Seed Monitoring System for Precision Agriculture',
+        name: 'KriFarm Equipments Seed Monitor',
+        short_name: 'KriFarm PWA',
+        description: 'Real-Time Outlet-Wise Seed Monitoring System by KriFarm Equipments Pvt. Ltd.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
