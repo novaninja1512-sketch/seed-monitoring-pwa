@@ -6,7 +6,7 @@ ALTER TABLE public.seed_counts ADD COLUMN IF NOT EXISTS offset_count INTEGER DEF
 
 -- 2. Create archived_sessions table (Stores previous session records)
 CREATE TABLE IF NOT EXISTS public.archived_sessions (
-    id UUID PRIMARY KEY DEFAULT extensions.uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     session_label TEXT,
     total_seeds INTEGER,
