@@ -33,7 +33,11 @@ function App() {
       ) : (
         <Dashboard 
           outletCount={outletCount} 
-          onLogout={async () => await supabase.auth.signOut()} 
+          onLogout={async () => {
+            const { error } = await supabase.auth.signOut();
+            if (error) console.error("Error signing out:", error);
+            setSession(null);
+          }} 
         />
       )}
     </>
