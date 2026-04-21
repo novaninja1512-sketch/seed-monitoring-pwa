@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import OutletWidget from './OutletWidget';
 import type { OutletData } from './OutletWidget';
-import { Activity, LogOut, Settings, Loader2, Database, RefreshCcw } from 'lucide-react';
+import { Activity, LogOut, Settings, Loader2, Database, RefreshCcw, Navigation, Gauge } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import ArchivesModal from './ArchivesModal';
 
@@ -11,22 +11,22 @@ interface DashboardProps {
 }
 
 const Dashboard = ({ onLogout, outletCount = 6 }: DashboardProps) => {
-  const [dataRows, setDataRows] = useState<any[]>([]);
+  const [machineData, setMachineData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showArchives, setShowArchives] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
-    // 1. Fetch initial rows from database
+    // 1. Fetch initial row from unified database
     const fetchData = async () => {
       const { data, error } = await supabase
-        .from('seed_counts')
+        .from('machine_state')
         .select('*')
-        .order('outlet_id', { ascending: true })
-        .limit(outletCount);
+        .eq('id', 1)
+        .single();
       
       if (!error && data) {
-        setDataRows(data);
+        setMachineData(data);
       }
       setLoading(false);
     };
@@ -35,46 +35,55 @@ const Dashboard = ({ onLogout, outletCount = 6 }: DashboardProps) => {
 
     // 2. Subscribe to realtime updates for absolute live visualization
     const subscription = supabase
-      .channel('realtime_seeds')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'seed_counts' }, (payload) => {
-        setDataRows((currentRows) => 
-          currentRows.map((row) => 
-            row.id === payload.new.id ? payload.new : row
-          )
-        );
+      .channel('realtime_machine')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'machine_state' }, (payload) => {
+        setMachineData(payload.new);
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'seed_counts' }, (payload) => {
-        setDataRows((current) => [...current, payload.new].sort((a,b) => a.outlet_id - b.outlet_id));
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'machine_state' }, (payload) => {
+        setMachineData(payload.new);
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, [outletCount]);
+  }, []);
 
-  // Handle the offset mathematics and anomaly detection
-  const outletsToDisplay: OutletData[] = dataRows.map(row => {
-    const physicalCount = parseInt(row.current_count || '0');
-    let offset = parseInt(row.offset_count || '0');
-    
-    // ANOMALY DETECTION: If physical count is lower than offset, the ESP32 restarted/lost power!
-    if (physicalCount < offset) {
-      // The ESP32's memory wiped and started at 0. Healing the database state:
-      offset = 0;
-      supabase.from('seed_counts').update({ offset_count: 0 }).eq('id', row.id);
+  // Process the 6 Outlets
+  const outletsToDisplay: OutletData[] = [];
+  if (machineData) {
+    for (let i = 1; i <= outletCount; i++) {
+        const physicalCount = parseInt(machineData[`c${i}`] || '0');
+        let offset = parseInt(machineData[`offset_c${i}`] || '0');
+
+        // Anomaly tracking identical to before!
+        if (physicalCount < offset) {
+            offset = 0;
+            supabase.from('machine_state').update({ [`offset_c${i}`]: 0 }).eq('id', 1);
+        }
+
+        outletsToDisplay.push({
+            id: i,
+            status: 'healthy',
+            seedCount: physicalCount - offset,
+            flowRate: 0 
+        });
     }
+  }
 
-    return {
-      id: row.outlet_id,
-      status: row.status as any,
-      seedCount: physicalCount - offset, // Display clean session math without desyncing hardware
-      flowRate: row.flow_rate
-    };
-  });
+  // Process Machine Scope variables
+  const physicalDistance = parseFloat(machineData?.distance_m || '0');
+  let offsetDistance = parseFloat(machineData?.offset_distance_m || '0');
+  if (physicalDistance < offsetDistance) {
+      offsetDistance = 0;
+      supabase.from('machine_state').update({ offset_distance_m: 0 }).eq('id', 1);
+  }
+  
+  const displayDistance = (physicalDistance - offsetDistance).toFixed(2);
+  const displayLevel = parseInt(machineData?.level_percent || '0');
 
   const handleResetSession = async () => {
-    if (!window.confirm("Are you sure you want to Archive this session and start counting from zero? (Your hardware will not be interrupted)")) return;
+    if (!window.confirm("Archive this session and start counting distance/seeds from zero?")) return;
     
     setResetting(true);
     
@@ -82,9 +91,10 @@ const Dashboard = ({ onLogout, outletCount = 6 }: DashboardProps) => {
     const sessionLabel = `Session: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`;
 
     // 1. Archive the visible data
-    const { error: archiveError } = await supabase.from('archived_sessions').insert({
+    const { error: archiveError } = await supabase.from('machine_archives').insert({
       session_label: sessionLabel,
       total_seeds: totalSeeds,
+      total_distance_m: parseFloat(displayDistance),
       outlet_data: outletsToDisplay
     });
 
@@ -95,14 +105,13 @@ const Dashboard = ({ onLogout, outletCount = 6 }: DashboardProps) => {
       return;
     }
 
-    // 2. Set the offset_counts in the database exactly equal to what the physical machine currently says
-    for (const row of dataRows) {
-      await supabase
-        .from('seed_counts')
-        .update({ offset_count: parseInt(row.current_count || '0') })
-        .eq('id', row.id);
+    // 2. Set ALL offsets to current physical thresholds
+    const updatePayload: any = { offset_distance_m: physicalDistance };
+    for (let i = 1; i <= outletCount; i++) {
+        updatePayload[`offset_c${i}`] = parseInt(machineData[`c${i}`] || '0');
     }
 
+    await supabase.from('machine_state').update(updatePayload).eq('id', 1);
     setResetting(false);
   };
 
@@ -131,7 +140,7 @@ const Dashboard = ({ onLogout, outletCount = 6 }: DashboardProps) => {
 
           <button 
             onClick={handleResetSession}
-            disabled={resetting || outletsToDisplay.length === 0}
+            disabled={resetting || !machineData}
             className="glass-panel btn" 
             style={{ padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--warning)', opacity: resetting ? 0.7 : 1 }} 
             title="Archive & Reset Count">
@@ -156,17 +165,57 @@ const Dashboard = ({ onLogout, outletCount = 6 }: DashboardProps) => {
           <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem 0' }}>
             <Loader2 className="animate-spin" size={48} color="var(--brand-primary)" />
           </div>
-        ) : outletsToDisplay.length === 0 ? (
+        ) : !machineData ? (
           <div className="glass-panel" style={{ padding: '3rem', textAlign: 'center' }}>
-            <h3>No Active Outlets Found</h3>
+            <h3>No Machine State Found</h3>
             <p style={{ color: 'var(--text-secondary)' }}>Please run the initial database schema script to populate the dashboard.</p>
           </div>
         ) : (
-          <div className={`grid-cols-${outletCount > 6 ? 4 : 3}`}>
-            {outletsToDisplay.map((outlet) => (
-              <OutletWidget key={outlet.id} data={outlet} />
-            ))}
-          </div>
+          <>
+            {/* NEW: Global Machine Stats Widgets */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+              <div className="glass-panel" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                <div style={{ background: 'rgba(16, 185, 129, 0.15)', padding: '1rem', borderRadius: '50%' }}>
+                  <Navigation color="var(--brand-secondary)" size={32} />
+                </div>
+                <div>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.25rem', fontWeight: 600 }}>Tractor Distance</p>
+                  <h3 style={{ fontSize: '2rem', display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                    {displayDistance} <span style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>meters</span>
+                  </h3>
+                </div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <Gauge color="var(--brand-primary)" size={24} />
+                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Seed Chamber Level</span>
+                  </div>
+                  <span style={{ fontWeight: 'bold', fontSize: '1.25rem', color: displayLevel < 20 ? 'var(--danger)' : 'white' }}>
+                    {displayLevel}%
+                  </span>
+                </div>
+                
+                {/* Visual Progress Bar */}
+                <div style={{ height: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+                    <div style={{ 
+                        height: '100%', 
+                        width: `${displayLevel}%`, 
+                        background: displayLevel < 20 ? 'var(--danger)' : 'var(--brand-primary)',
+                        transition: 'width 0.5s ease-out, background 0.5s ease-out'
+                    }}></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Existing 6 Outlet Display */}
+            <div className={`grid-cols-${outletCount > 6 ? 4 : 3}`}>
+              {outletsToDisplay.map((outlet) => (
+                <OutletWidget key={outlet.id} data={outlet} />
+              ))}
+            </div>
+          </>
         )}
       </main>
 

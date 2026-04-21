@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Calendar, Database } from 'lucide-react';
+import { X, Calendar, Database, Navigation } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { OutletData } from './OutletWidget';
 
@@ -8,6 +8,7 @@ interface ArchivedSession {
   created_at: string;
   session_label: string;
   total_seeds: number;
+  total_distance_m: number;
   outlet_data: OutletData[];
 }
 
@@ -22,7 +23,7 @@ export default function ArchivesModal({ onClose }: ArchivesModalProps) {
   useEffect(() => {
     async function fetchArchives() {
       const { data } = await supabase
-        .from('archived_sessions')
+        .from('machine_archives')
         .select('*')
         .order('created_at', { ascending: false });
       if (data) setArchives(data);
@@ -55,7 +56,7 @@ export default function ArchivesModal({ onClose }: ArchivesModalProps) {
           ) : (
             archives.map(archive => (
               <div key={archive.id} style={{ background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
                     <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem', color: 'var(--text-primary)' }}>
                       <Calendar size={18} /> {archive.session_label}
@@ -64,8 +65,13 @@ export default function ArchivesModal({ onClose }: ArchivesModalProps) {
                       {new Date(archive.created_at).toLocaleString()}
                     </p>
                   </div>
-                  <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid var(--brand-primary)', color: 'var(--brand-primary)', padding: '0.5rem 1rem', borderRadius: '2rem', fontWeight: 'bold', fontSize: '0.9rem' }}>
-                    Total: {archive.total_seeds} seeds
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ background: 'rgba(56, 189, 248, 0.1)', border: '1px solid var(--brand-secondary)', color: 'var(--brand-secondary)', padding: '0.5rem 1rem', borderRadius: '2rem', fontWeight: 'bold', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <Navigation size={14}/> {archive.total_distance_m} m
+                    </div>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid var(--brand-primary)', color: 'var(--brand-primary)', padding: '0.5rem 1rem', borderRadius: '2rem', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                        Total: {archive.total_seeds} seeds
+                    </div>
                   </div>
                 </div>
                 
